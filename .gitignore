@@ -1,4 +1,4 @@
 .env
 /templates
-/data_set
+/data
 .venv/
