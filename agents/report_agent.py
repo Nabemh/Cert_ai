@@ -1,6 +1,7 @@
 from jinja2 import Environment, FileSystemLoader
 import markdown
 import pdfkit
+from weasyprint import HTML
 import os
 
 class ReportGenerator:
@@ -16,9 +17,9 @@ class ReportGenerator:
         html_content = template.render(insights=insights, advisories=advisories)
         return html_content
 
-    def export_pdf(self, html_content: str, output_filename="threat_report.pdf"):
+    def export_pdf(self, html_content: str, output_filename="report.pdf"):
         output_path = os.path.join(self.output_dir, output_filename)
-        pdfkit.from_string(html_content, output_path)
+        HTML(string=html_content).write_pdf(output_path)
         return output_path
 
     def run(self, insights, advisories, output_filename="threat_report.pdf"):
