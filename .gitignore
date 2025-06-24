@@ -2,3 +2,4 @@
 /templates
 /data
 .venv/
+.ipynb_checkpoints/
