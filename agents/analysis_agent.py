@@ -7,7 +7,7 @@ class AnalysisAgent:
         self.df = df
         self.output_dir = output_dir
         os.makedirs(self.output_dir, exist_ok=True)
-    
+
     def _save_plot(self, fig, name):
         path = os.path.join(self.output_dir, f"{name}.png")
         fig.savefig(path, bbox_inches='tight')
