@@ -1,14 +1,13 @@
-from langchain.document_loaders import PyPDFLoader
-from langchain.vectorstores import Chroma
-from langchain.embeddings import GoogleGenerativeAIEmbeddings
-from langchain.schema import Document
+from langchain_community.document_loaders import PyPDFLoader
+from langchain_community.vectorstores import Chroma
+from langchain_google_genai import GoogleGenerativeAIEmbeddings
+from langchain_core.documents import Document
 from dotenv import load_dotenv
 import os
 
 load_dotenv()
 
 def embed_pdf_sections(pdf_path="templates/JUNE 2024 NCC_CSIRT CYBERSECURITY REPORT_.pdf", db_path="vectorstore/"):
-    # Load and concatenate full PDF text
     loader = PyPDFLoader(pdf_path)
     pages = loader.load()
     full_text = "\n".join([page.page_content for page in pages])
@@ -33,6 +32,7 @@ def embed_pdf_sections(pdf_path="templates/JUNE 2024 NCC_CSIRT CYBERSECURITY REP
         if not line:
             continue
 
+        # Find if the line contains a known section header
         match = [label for keyword, label in section_map.items() if keyword in line.lower()]
         if match:
             current_section = match[0]
@@ -42,20 +42,27 @@ def embed_pdf_sections(pdf_path="templates/JUNE 2024 NCC_CSIRT CYBERSECURITY REP
         else:
             sections[current_section] += line + "\n"
 
-    # Prepare documents with metadata
     documents = [
         Document(page_content=content.strip(), metadata={"section": section})
         for section, content in sections.items()
         if content.strip()
     ]
 
-    # Embed the documents into Chroma
-    vectorstore = Chroma.from_documents(
-        documents,
-        embedding=GoogleGenerativeAIEmbeddings(model="models/embedding-001"),
-        persist_directory=db_path
+    google_api_key = os.getenv("GOOGLE_API_KEY")
+    if not google_api_key:
+        raise ValueError("GOOGLE_API_KEY not found in environment variables")
+
+    # Embed documents into Chroma
+    embeddings = GoogleGenerativeAIEmbeddings(
+        model="models/embedding-001",
+        google_api_key=google_api_key
     )
 
+    vectorstore = Chroma.from_documents(
+        documents=documents,
+        embedding=embeddings,
+        persist_directory=db_path
+    )
     vectorstore.persist()
     print("✅ Section-based PDF embedded into vector store.")
 
