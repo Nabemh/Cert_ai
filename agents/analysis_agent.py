@@ -31,14 +31,14 @@ class AnalysisAgent:
         for container in ax.containers:
             ax.bar_label(container, fmt='%.0f', padding=3)
 
-        bar_path = self._save_plot(fig, "top_threat_categories_bar")
+        bar_path = self._save_plot(fig, "threat_categories_bar")
 
         # Plot doughnut
         top3_ip = self.df.groupby('Category')['IP'].nunique().sort_values(ascending=False).head(3)
         fig, ax = plt.subplots(figsize=(4,4))
         ax.pie(top3_ip, labels=top3_ip.index, autopct='%1.1f%%', startangle=90, wedgeprops={'width': 0.4})
         ax.set_title("Top 3 Threat Categories by Unique IPs")
-        doughnut_path = self._save_plot(fig, "top_threat_categories_doughnut")
+        doughnut_path = self._save_plot(fig, "threat_categories_doughnut")
 
         return {
             "summary_table": top3.reset_index().to_dict(orient="records"),
@@ -68,7 +68,7 @@ class AnalysisAgent:
         for container in ax.containers:
             ax.bar_label(container, fmt='%.0f', padding=3)
 
-        plot_path = self._save_plot(fig, "top_regions")
+        plot_path = self._save_plot(fig, "regions")
 
         return {
             "top_regions_table": top5.reset_index().to_dict(orient="records"),
@@ -82,7 +82,7 @@ class AnalysisAgent:
         ax.pie(ccip_summary, labels=ccip_summary.index, autopct='%1.1f%%', startangle=90, wedgeprops={'width': 0.4})
         ax.set_title("Top 5 C&C IPs by Unique IPs")
 
-        plot_path = self._save_plot(fig, "top_c2_ips")
+        plot_path = self._save_plot(fig, "c2_ips")
 
         return {
             "top_cc_ips": ccip_summary.reset_index().rename(columns={"CC_Ip": "IP", "IP": "Unique Count"}).to_dict(orient="records"),
@@ -108,7 +108,7 @@ class AnalysisAgent:
         for container in ax.containers:
             ax.bar_label(container, fmt='%.0f', padding=3)
 
-        plot_path = self._save_plot(fig, "top_malware")
+        plot_path = self._save_plot(fig, "malware")
 
         return {
             "top_malware_table": malware_summary.reset_index().to_dict(orient="records"),
@@ -121,5 +121,7 @@ class AnalysisAgent:
             "vulnerability_summary": self.vulnerability_summary(),
             "top_regions": self.top_regions(),
             "top_c2_ips": self.top_c2_ips(),
-            "top_malware": self.top_malware()
+            "top_malware": self.top_malware(),
+            "smart_summary": ''
         }
+
