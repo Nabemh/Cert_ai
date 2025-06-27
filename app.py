@@ -4,6 +4,7 @@ from agents.analysis_agent import AnalysisAgent
 from agents.advisory_agent import AdvisoryAgent
 from agents.rag_engine import RAGEngine
 import os
+from agents.report_agent import ReportGenerator
 
 FAKE_ADVISORIES = [
     {
@@ -23,8 +24,8 @@ FAKE_ADVISORIES = [
         "Alert": True
     }
 ]
-st.set_page_config(page_title="Cyber Threat Dashboard", layout="wide")
-st.title("🛡️ Cyber Threat Intelligence Dashboard")
+st.set_page_config(page_title="CSIRT Report Gen", layout="wide")
+st.title("🛡️ CSIRT Reports")
 
 # Initialize session state
 session_defaults = {
@@ -43,6 +44,11 @@ if uploaded_file:
     df = pd.read_csv(uploaded_file)
     agent = AnalysisAgent(df)
     insights = agent.run()
+
+    # Generate smart summary using RAG
+    rag = RAGEngine()
+    insights["smart_summary"] = rag.generate_smart_summary(insights)
+
     st.session_state.insights = insights
 
     # Display charts - USING DICTIONARY ACCESS
@@ -94,17 +100,28 @@ if st.session_state.insights:
     with tab2:
         if st.button("Generate Full HTML Report"):
             rag = RAGEngine()
-            html_report = rag.generate_report(
+            html_content, narrative = rag.generate_report(
                 st.session_state.insights,
-                st.session_state.advisories or FAKE_ADVISORIES,
-                plot_dir="plots" 
+                st.session_state.advisories or FAKE_ADVISORIES
             )
+
+            from agents.report_agent import ReportGenerator
+            report_gen = ReportGenerator()
+
+            # Generate final HTML using Jinja2 + narrative
+            html_path = report_gen.run(
+                insights=st.session_state.insights,
+                advisories=st.session_state.advisories or FAKE_ADVISORIES,
+                narrative=narrative
+            )
+
+            with open(html_path, "r") as f:
+                html_output = f.read()
 
             st.download_button(
                 "Download Report",
-                html_report,
+                html_output,
                 file_name="threat_report.html"
             )
-            st.components.v1.html(html_report, height=800, scrolling=True)
-else:
-    st.warning("Please upload and analyze data first.")
+
+            st.components.v1.html(html_output, height=800, scrolling=True)
