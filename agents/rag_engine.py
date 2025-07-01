@@ -5,7 +5,9 @@ from langchain.prompts import PromptTemplate
 import os
 from dotenv import load_dotenv
 import base64
+from markupsafe import Markup
 from pathlib import Path
+from jinja2 import Environment, FileSystemLoader
 
 load_dotenv()
 
@@ -30,35 +32,47 @@ DEFAULT_TEMPLATE = """STANDARD INCIDENT REPORT TEMPLATE:
    """
 
 
-REPORT_PROMPT_TEMPLATE = """
-**Task:** Generate a comprehensive threat intelligence report using the provided data and visualizations.
+# REPORT_PROMPT_TEMPLATE = """
+# You are a cybersecurity analyst assistant. Write a professional cyber threat intelligence report.
 
-**Formatting Guide:**
-{formatting_guide}
+# Use the example report below to model your tone, structure, and language style.
 
-**Data Overview:**
-- Threat categories (already visualized)
-- Top geographical regions (already visualized)
-- Prevalent malware types (already visualized)
-- Command & Control infrastructure (already visualized)
+# **Example Report Section (Style Guide):**
+# {style_reference}
 
-**Specific Instructions:**
-1. Begin with an executive summary highlighting key findings
-2. Analyze each threat category with context from the visualizations
-3. Explain geographical distribution patterns
-4. Detail malware trends and their implications
-5. Assess C2 infrastructure significance
-6. Include actionable recommendations
-7. Maintain professional, technical tone suitable for security analysts
+# **Instructions:**
+# 1. Start with an executive summary
+# 2. Include monitoring summaries, C2 IP analysis, malware, and affected regions in different bullet points under the heading Key Findings 
+#     and the subheading Cyberspace Monitoring Activities
+# 3. Use numeric insights
 
-**Raw Data:**
-{insights}
+# **Data:**
+# Insights:
+# {insights}
 
-**Advisories:**
-{advisories}
+# """
 
-**Note:** The charts are already embedded in the report. Reference them naturally in your analysis.
-"""
+SECTION_PROMPTS = {
+    "executive_summary": """You are a cyber threat analyst and this is an official introduction to this document, which highlights a few insights that were gotten from this month's report you do not need an official heading that says  'Executive Summary' that is already handled
+                            Make it in one paragraph, """,
+
+
+    "malware_summary": """Summarize the malware activity from the insights below. Mention top families, anomalies, and key numbers:\n\n{insights} keep this brief and concise this is only a summary of the malware activity""",
+
+    "c2_summary": """Summarize the Command & Control (C&C) infrastructure trends and notable IPs based on this insight:\n\n{insights} keep this brief and concise this is only a summary of the C&C activity""",
+
+    "geo_summary": """Analyze the geographic distribution of attacks. Focus on the most affected regions and anomalies:\n\n{insights} keep this brief and concise this is only a summary of the geographic activity""",
+
+    "key_findings": """You are a cyber threat analyst. Write and Include monitoring summaries, C&C IP analysis, malware, and affected regions in a few different bullet points under the heading Key Findings 
+    and the subheading Cyberspace Monitoring Activities: \n\nInsights:\n{insights}\n\nAdvisories:\n{advisories} """,
+
+    "recommendations": """
+                        You are a cyber threat analyst. Write recommendations based on the insights and advisories provided use bullet points. 
+                        Focus on actionable steps to mitigate threats and improve security posture. Use the following insights: \n\nInsights:\n{insights}\n\nAdvisories:\n{advisories}""",
+
+}
+
+
 
 class RAGEngine:
     def __init__(self, vectorstore_path="vectorstore/"):
@@ -74,14 +88,14 @@ class RAGEngine:
             model="models/embedding-001",
             google_api_key=google_api_key
         )
-        
+
         # Initialize Chroma vectorstore
         self.vectorstore = Chroma(
             persist_directory=vectorstore_path,
             embedding_function=self.embedding
         )
         self.retriever = self.vectorstore.as_retriever()
-        
+
         # Initialize Gemini LLM
         self.llm = ChatGoogleGenerativeAI(
             model="gemini-1.5-flash",
@@ -106,55 +120,112 @@ class RAGEngine:
         result = qa_chain.run(query)
         return result
 
-    def generate_report(self, insights: dict, advisories: list, plot_dir="plots"):
-    # Safely get template
-        try:
-            results = self.vectorstore.similarity_search("incident report template", k=1)
-            formatting_guide = results[0].page_content if results else DEFAULT_TEMPLATE
-        except Exception as e:
-            print(f"Template loading error: {e}")
-            formatting_guide = DEFAULT_TEMPLATE
+    # def generate_narrative(self, insights, advisories):
+    #     """LLM generates narrative report using embedded PDF as style reference."""
+    #     try:
+    #         style_doc = self.vectorstore.similarity_search(
+    #             "summary of threat activity",
+    #             filter={"section": "Executive Summary"},
+    #             k=1
+    #         )
+    #         style_reference = style_doc[0].page_content if style_doc else DEFAULT_TEMPLATEa
+    #     except Exception as e:
+    #         print(f"Style fallback: {e}")
+    #         style_reference = DEFAULT_TEMPLATE
 
-        # Convert all images to base64
-        image_data = {
-            'threat_categories_bar': self.image_to_base64(f"{plot_dir}/top_threat_categories_bar.png"),
-            'threat_categories_doughnut': self.image_to_base64(f"{plot_dir}/top_threat_categories_doughnut.png"),
-            'regions': self.image_to_base64(f"{plot_dir}/top_regions.png"),
-            'malware': self.image_to_base64(f"{plot_dir}/top_malware.png"),
-            'c2_ips': self.image_to_base64(f"{plot_dir}/top_C2_ips.png")
+    #     prompt = PromptTemplate(
+    #         input_variables=["style_reference", "insights", "advisories"],
+    #         template=REPORT_PROMPT_TEMPLATE
+    #     )
+    #     final_prompt = prompt.format(
+    #         style_reference=style_reference,
+    #         insights=str(insights),
+    #         advisories=str(advisories)
+    #     )
+
+    #     return self.llm.invoke(final_prompt).content
+
+
+    def generate_smart_summary(self, insights: dict) -> str:
+        summary_prompt = PromptTemplate.from_template("""
+            You are a cybersecurity analyst. Summarize the following dataset into 3-5 bullet points of key intelligence findings.
+
+            Be concise, use metrics (e.g. "92564 events", "26094 unique IPs"), and mention top threat categories, regions, malware, and any anomaly.
+
+            Insights:
+            {insights}
+            """)
+
+        prompt_text = summary_prompt.format(insights=str(insights))
+        return self.llm.invoke(prompt_text).content
+    
+    def generate_section(self, section_key, insights, advisories=None):
+        try:
+            template_str = SECTION_PROMPTS[section_key]
+            prompt = PromptTemplate(
+                input_variables=["insights", "advisories"],
+                template=template_str
+            )
+            filled_prompt = prompt.format(
+                insights=str(insights),
+                advisories=str(advisories) if advisories else ""
+            )
+            return self.llm.invoke(filled_prompt).content
+        except Exception as e:
+            print(f"[{section_key}] Error: {e}")
+            return f"Could not generate {section_key}."
+
+
+    # def generate_report(self, insights: dict, advisories: list, plot_dir="plots"):
+    #     # 1. Get style for narrative
+    #     narrative = self.generate_narrative(insights, advisories)
+
+    #     # 2. Encode plots to base64
+    #     images = {
+    #         'threat_categories_bar': self.image_to_base64(f"{plot_dir}/threat_categories_bar.png"),
+    #         'threat_categories_doughnut': self.image_to_base64(f"{plot_dir}/threat_categories_doughnut.png"),
+    #         'regions': self.image_to_base64(f"{plot_dir}/regions.png"),
+    #         'malware': self.image_to_base64(f"{plot_dir}/malware.png"),
+    #         'c2_ips': self.image_to_base64(f"{plot_dir}/c2_ips.png")
+    #     }
+
+    #     # 3. Load Jinja2 template
+    #     env = Environment(loader=FileSystemLoader("templates"))
+    #     template = env.get_template("report_template.md")
+
+    #     # 4. Render
+    #     md_content = template.render(
+    #     narrative=narrative,
+    #     insights=insights,
+    #     advisories=advisories,
+    #     images=images
+    # )
+    #     return md_content, narrative
+
+    def generate_report(self, insights: dict, advisories: list, plot_dir="plots"):
+        # Base64 encode images
+        images = {
+            'threat_categories_bar': self.image_to_base64(f"{plot_dir}/threat_categories_bar.png"),
+            'threat_categories_doughnut': self.image_to_base64(f"{plot_dir}/threat_categories_doughnut.png"),
+            'regions': self.image_to_base64(f"{plot_dir}/regions.png"),
+            'malware': self.image_to_base64(f"{plot_dir}/malware.png"),
+            'c2_ips': self.image_to_base64(f"{plot_dir}/c2_ips.png")
         }
 
-        # Generate HTML with proper dictionary access
-        html_report = f"""
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>Threat Intelligence Report</title>
-        <style>
-            /* Your existing styles */
-        </style>
-    </head>
-    <body>
-        <h1>Threat Intelligence Report</h1>
-        
-        <h2>🔎 Threat Categories (Top 3)</h2>
-        <div class="image-row">
-            <img src="data:image/png;base64,{image_data['threat_categories_bar']}" 
-                alt="Threat Categories Bar Chart">
-            <img src="data:image/png;base64,{image_data['threat_categories_doughnut']}" 
-                alt="Threat Categories Doughnut Chart">
-        </div>
-        
-        <table>
-            <tr><th>Category</th><th>Frequency</th><th>Unique IPs</th></tr>
-            {"".join(
-                f"<tr><td>{row['Category']}</td><td>{row['Count of TID']}</td><td>{row['Count of IP']}</td></tr>"
-                for row in insights["threat_categories"]["summary_table"]  # Fixed dictionary access
-            )}
-        </table>
-        
-        <!-- Repeat for other sections with similar fixes -->
-    </body>
-    </html>
-        """
-        return html_report
+        # Modular LLM-generated sections
+        context = {
+            "executive_summary": self.generate_section("executive_summary", insights, advisories),
+            "malware_summary": self.generate_section("malware_summary", insights),
+            "c2_summary": self.generate_section("c2_summary", insights),
+            "geo_summary": self.generate_section("geo_summary", insights),
+            "key_findings": self.generate_section("key_findings", insights),
+            "recommendations": self.generate_section("recommendations:", insights, advisories),
+            "insights": insights,
+            "advisories": advisories,
+            "images": images
+        }
+
+        # Load and render template
+        env = Environment(loader=FileSystemLoader("templates"))
+        template = env.get_template("report_template.md")
+        return template.render(**context)
