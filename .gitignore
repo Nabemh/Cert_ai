@@ -2,6 +2,7 @@
 /templates
 /data
 .venv/
-.ipynb_checkpoints/
 agents/__pycache__
 vectorstore/
+.ipynb_checkpoints/
+.DS_Store
