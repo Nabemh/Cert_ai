@@ -219,7 +219,7 @@ class RAGEngine:
             "c2_summary": self.generate_section("c2_summary", insights),
             "geo_summary": self.generate_section("geo_summary", insights),
             "key_findings": self.generate_section("key_findings", insights),
-            "recommendations": self.generate_section("recommendations:", insights, advisories),
+            "recommendations": self.generate_section("recommendations", insights, advisories),
             "insights": insights,
             "advisories": advisories,
             "images": images

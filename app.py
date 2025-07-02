@@ -82,7 +82,7 @@ if st.session_state.advisories:
 # === Report Generation ===
 st.header("📄 Generate Comprehensive Report")
 if st.session_state.insights:
-    tab1, tab2 = st.tabs(["📝 Text Report", "🖥️ HTML Report"])
+    tab1, tab2 = st.tabs(["📝 Text Report", "🖥️ Report Markdown"])
     
     with tab1:
         if st.button("Generate Text Analysis"):
@@ -98,30 +98,18 @@ if st.session_state.insights:
                         height=400)
     
     with tab2:
-        if st.button("Generate Full HTML Report"):
-            rag = RAGEngine()
-            html_content, narrative = rag.generate_report(
-                st.session_state.insights,
-                st.session_state.advisories or FAKE_ADVISORIES
-            )
+     if st.button("Generate Full Markdown Report"):
+        rag = RAGEngine()
+        markdown_content = rag.generate_report(
+        st.session_state.insights,
+        st.session_state.advisories or FAKE_ADVISORIES
+        )
 
-            from agents.report_agent import ReportGenerator
-            report_gen = ReportGenerator()
 
-            # Generate final HTML using Jinja2 + narrative
-            html_path = report_gen.run(
-                insights=st.session_state.insights,
-                advisories=st.session_state.advisories or FAKE_ADVISORIES,
-                narrative=narrative
-            )
+        st.download_button(
+            "Download Markdown Report",
+            markdown_content,
+            file_name="threat_report.md"
+        )
 
-            with open(html_path, "r") as f:
-                html_output = f.read()
-
-            st.download_button(
-                "Download Report",
-                html_output,
-                file_name="threat_report.html"
-            )
-
-            st.components.v1.html(html_output, height=800, scrolling=True)
+        st.markdown(markdown_content, unsafe_allow_html=False)
