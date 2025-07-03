@@ -87,17 +87,21 @@ if st.session_state.advisories:
             *{adv['Date']}* | Impact: {adv['Impact']}
         """)
 
-# === Threat Intelligence Assistant ===
-st.header("🧠 Threat Intelligence Assistant")
-if st.session_state.query_agent:
-    user_query = st.text_input("Ask a question (e.g. 'Analyze 8.8.8.8', 'Top malware this month')")
+# === Threat Intelligence Chatbot ===
+st.header("🤖 Threat Intelligence Chatbot")
 
-    if user_query:
-        with st.spinner("Analyzing..."):
-            response = asyncio.run(st.session_state.query_agent.process_query(user_query))
-        st.markdown(response)
-else:
-    st.info("Upload a dataset first to activate the assistant.")
+query_input = st.text_input("Ask a question about the threat insights or IP addresses:")
+
+if st.button("Get Response") and query_input:
+    with st.spinner("Analyzing..."):
+        # Initialize QueryAgent with current insights
+        agent = QueryAgent(insights_data=st.session_state.insights or {})
+
+        # Run the query
+        response = asyncio.run(agent.process_query(query_input, query_type="auto"))
+
+    st.subheader("🔎 Response")
+    st.text_area("Bot Response", value=response, height=300)
 
 
 # === Report Generation ===
