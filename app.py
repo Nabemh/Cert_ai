@@ -5,6 +5,9 @@ from agents.advisory_agent import AdvisoryAgent
 from agents.rag_engine import RAGEngine
 import os
 from agents.report_agent import ReportGenerator
+from agents.query_agent import QueryAgent
+import asyncio
+
 
 FAKE_ADVISORIES = [
     {
@@ -31,8 +34,10 @@ st.title("🛡️ CSIRT Reports")
 session_defaults = {
     "insights": None,
     "advisories": None,
-    "generated_report": None
+    "generated_report": None,
+    "query_agent": None
 }
+
 for key, val in session_defaults.items():
     if key not in st.session_state:
         st.session_state[key] = val
@@ -50,6 +55,9 @@ if uploaded_file:
     insights["smart_summary"] = rag.generate_smart_summary(insights)
 
     st.session_state.insights = insights
+
+    # Initialize QueryAgent with insights
+    st.session_state.query_agent = QueryAgent(insights_data=insights)
 
     # Display charts - USING DICTIONARY ACCESS
     st.subheader("📊 Threat Overview")
@@ -79,11 +87,24 @@ if st.session_state.advisories:
             *{adv['Date']}* | Impact: {adv['Impact']}
         """)
 
+# === Threat Intelligence Assistant ===
+st.header("🧠 Threat Intelligence Assistant")
+if st.session_state.query_agent:
+    user_query = st.text_input("Ask a question (e.g. 'Analyze 8.8.8.8', 'Top malware this month')")
+
+    if user_query:
+        with st.spinner("Analyzing..."):
+            response = asyncio.run(st.session_state.query_agent.process_query(user_query))
+        st.markdown(response)
+else:
+    st.info("Upload a dataset first to activate the assistant.")
+
+
 # === Report Generation ===
 st.header("📄 Generate Comprehensive Report")
 if st.session_state.insights:
     tab1, tab2 = st.tabs(["📝 Text Report", "🖥️ Report Markdown"])
-    
+
     with tab1:
         if st.button("Generate Text Analysis"):
             rag = RAGEngine()
