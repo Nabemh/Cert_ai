@@ -57,7 +57,7 @@ class QueryAgent:
             4. Reputation and abuse history
             5. Any suspicious indicators
 
-            Format your response clearly and highlight important security-relevant information.
+            Format your response clearly and highlight important security-relevant information and if needed structure some of the ip_data in bullet points.
             """
         )
 
