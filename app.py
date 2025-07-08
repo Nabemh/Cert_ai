@@ -7,6 +7,7 @@ import os
 from agents.report_agent import ReportGenerator
 from agents.query_agent import QueryAgent
 import asyncio
+from db.connect import load_threat_data
 
 
 FAKE_ADVISORIES = [
@@ -43,36 +44,40 @@ for key, val in session_defaults.items():
         st.session_state[key] = val
 
 # === Upload and Analyze ===
-st.header("📁 Upload Threat Dataset")
-uploaded_file = st.file_uploader("Upload a .csv threat dataset", type=["csv"])
-if uploaded_file:
-    df = pd.read_csv(uploaded_file)
-    agent = AnalysisAgent(df)
-    insights = agent.run()
+st.header("🧠 Run Threat Analysis")
+if st.button("Run Analysis"):
+    with st.spinner("Loading data from PostgreSQL..."):
+        try:
+            df = load_threat_data()
+            agent = AnalysisAgent(df)
+            insights = agent.run()
 
-    # Generate smart summary using RAG
-    rag = RAGEngine()
-    insights["smart_summary"] = rag.generate_smart_summary(insights)
+            # Generate smart summary using RAG
+            rag = RAGEngine()
+            insights["smart_summary"] = rag.generate_smart_summary(insights)
 
-    st.session_state.insights = insights
+            st.session_state.insights = insights
+            st.session_state.query_agent = QueryAgent(insights_data=insights)
 
-    # Initialize QueryAgent with insights
-    st.session_state.query_agent = QueryAgent(insights_data=insights)
+            st.success("Analysis complete!")
 
-    # Display charts - USING DICTIONARY ACCESS
-    st.subheader("📊 Threat Overview")
-    col1, col2 = st.columns(2)
-    with col1:
-        st.image(insights["threat_categories"]["bar_chart"], caption="Top Threat Categories")
-    with col2:
-        st.image(insights["threat_categories"]["doughnut_chart"])
+            # === Display Charts ===
+            st.subheader("📊 Threat Overview")
+            col1, col2 = st.columns(2)
+            with col1:
+                st.image(insights["threat_categories"]["bar_chart"], caption="Top Threat Categories")
+            with col2:
+                st.image(insights["threat_categories"]["doughnut_chart"])
 
-    st.image(insights["top_regions"]["bar_chart"], caption="Top 5 Regions")
-    st.image(insights["top_malware"]["bar_chart"], caption="Top Malware")
-    st.image(insights["top_c2_ips"]["doughnut_chart"], caption="Top 5 C2 IPs")
+            st.image(insights["top_regions"]["bar_chart"], caption="Top 5 Regions")
+            st.image(insights["top_malware"]["bar_chart"], caption="Top Malware")
+            st.image(insights["top_c2_ips"]["doughnut_chart"], caption="Top 5 C2 IPs")
 
-    st.subheader("🧾 Vulnerability Summary")
-    st.write(insights["vulnerability_summary"])
+            st.subheader("🧾 Vulnerability Summary")
+            st.write(insights["vulnerability_summary"])
+
+        except Exception as e:
+            st.error(f"Error: {str(e)}")
 # === Advisories ===
 st.header("🌐 Live NCC-CSIRT Advisories")
 if st.button("Fetch Latest Advisories"):
