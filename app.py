@@ -71,7 +71,7 @@ if st.button("Run Analysis"):
 
             st.image(insights["top_regions"]["bar_chart"], caption="Top 5 Regions")
             st.image(insights["top_malware"]["bar_chart"], caption="Top Malware")
-            st.image(insights["top_c2_ips"]["doughnut_chart"], caption="Top 5 C2 IPs")
+            st.image(insights["top_c&c_ips"]["doughnut_chart"], caption="Top 5 C2 IPs")
 
             st.subheader("🧾 Vulnerability Summary")
             st.write(insights["vulnerability_summary"])

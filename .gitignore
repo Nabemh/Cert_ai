@@ -6,3 +6,4 @@ agents/__pycache__
 vectorstore/
 .ipynb_checkpoints/
 .DS_Store
+db/__pycache__

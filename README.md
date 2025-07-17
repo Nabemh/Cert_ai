@@ -54,7 +54,7 @@
 ---  
 
 ### ⚙️ C&C_IP Infrastructure  
-![Top Command and Control IP](./plots/c2_ips.png)
+![Top Command and Control IP](./plots/c&c_ips.png)
 
 | C&C IP             | Affected Unique IPs |  
 |--------------------|---------------------|  
